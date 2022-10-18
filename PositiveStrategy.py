@@ -1,5 +1,6 @@
 import numpy as np
 import OnlineVariance as ov
+from IPython import embed
 class PositiveStrategy(object):
     """
     Positive strategy selector.
@@ -37,9 +38,20 @@ class PositiveStrategy(object):
         for d in range(0,self.D):
             if features[d] > 0:
                 self.stats[arm,d].include(value)
+                
+    def get_abas(self,arm):
+        abas = []
+        for x in self.stats[arm]:
+            abas.append(np.random.normal(x.mean, x.std if x.std > 0 else 1.0))
+        return np.asarray(abas)
 
     def estimate(self, arm, features):
-        return np.sum(features * map(lambda x: np.random.normal(x.mean, x.std if x.std > 0 else 1), self.stats[arm]))
+        # self.get_map(arm,features)
+        # aba = map(lambda x: np.random.normal(x.mean, x.std if x.std > 0 else 1), self.stats[arm])
+        # print(aba)
+        abas = self.get_abas(arm)
+
+        return np.sum(features * abas)
 
     def rmse(self, weights):
 #        print weights

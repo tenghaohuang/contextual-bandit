@@ -1,6 +1,8 @@
 import numpy as np
 import OnlineVariance as ov
+from IPython import embed
 class Simulator(object):
+
     """
     Simulate model
     epsilon=0.05 learning rate
@@ -17,11 +19,12 @@ class Simulator(object):
                 self.stats[k,d] = ov.OnlineVariance(ddof=0)
 
     def simulate(self,features,rewards,weights):
-        N = rewards.size/self.K
-
+        N = int(rewards.size/self.K)
+        print(N)
         regret = np.zeros((N,1))
         rmse = np.zeros((N,1))
-
+        if N ==1:
+            rewards = [rewards]
         for i in range(0,N):
             F = features[i]
             R = rewards[i]
@@ -33,7 +36,7 @@ class Simulator(object):
             #known reward and correct choice
             armMaxReward = 0.
             armOptimal = 0
-
+            # embed()
             for k in range(0,self.K):
                 #identify the optimal arm to choose
                 if R[k] > armMaxReward:
@@ -58,7 +61,7 @@ class Simulator(object):
             armReward = R[armChoice]
             armRegret = armMaxReward - armReward
             regret[i] = armRegret
-            rmse[i]   = self.model.rmse(weights)
+            rmse[i] = self.model.rmse(weights)
 
             #reward/penalize accordingly
             if armRegret == 0:
@@ -66,4 +69,4 @@ class Simulator(object):
             else:
                 self.model.include(armChoice, F, -1 * armRegret)
             
-        return regret, rmse
+        return regret, rmse,armChoice

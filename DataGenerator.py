@@ -58,44 +58,23 @@ class DataGenerator():
         return l
 
 
-    def get_reward_each_bucket(self, tup, budget, anchors, crt_length):
-        best_per_bucket = []
-        val_scores, arousal_scores = tup
-        sample_rewards = []
-        branch_facts = [True if budget > b else False for b in self.branch_factors]
-
-
-        for num, b in enumerate(self.branch_factors):
-
-            # embed()
-            if branch_facts[num] is False:
-                arousal_scores_tmp = self.group_bucket(arousal_scores, anchors, budget)
-                arousal_scores_tmp.sort(key=lambda tup: tup[0], reverse=True)
-                sample_rewards.append(arousal_scores_tmp[0][0])
-                best_per_bucket.append(arousal_scores_tmp[:2])
-            else:
-                arousal_scores_tmp = self.group_bucket(arousal_scores, anchors, b)
-                arousal_scores_tmp.sort(key=lambda tup: tup[0], reverse=True)
-                sample_rewards.append(arousal_scores_tmp[0][0])
-                best_per_bucket.append(arousal_scores_tmp[:2])
-        # if crt_length > 3:
-        #
-        return sample_rewards, best_per_bucket
-
     def get_topk_reward_each_bucket(self, buckets, budget, crt_length):
         sample_rewards = []
         best_per_bucket = []
         # branch_facts = [True if budget > b else False for b in self.branch_factors]
 
         # print(tup)
+        # embed()#look at perplex
         for num in range(len(buckets)):
 
-            # embed()
+
             b = self.branch_factors[num]
 
+
             buckets[num].sort(key=lambda tup: tup[1], reverse=True)
-            sample_rewards.append(buckets[num][0][1]-0.0025*b)
-            best_per_bucket.append((buckets[num][0][0],buckets[num][0][1]-0.0025*b))
+            sample_rewards.append(buckets[num][0][1]-0.0010*b)
+            best_per_bucket.append((buckets[num][0][0],buckets[num][0][1]-0.0010*b,\
+                                    buckets[num][0][-1]))
 
         return sample_rewards, best_per_bucket
 
@@ -104,31 +83,39 @@ class DataGenerator():
             buckets[num]+=txts_at_timestep[:b]
         return buckets
 
-    def generate_gpt_topk_example(self,text_prompts, crt_length, crt_budget):
+    def generate_gpt_topk_example(self,text_prompts_ppls, crt_length, crt_budget):
         txts_at_timestep = []
 
         overall_features = []
 
-        buckets = [[]]*len(self.branch_factors)
+        buckets = [[],[],[]]
         max_txt_v = -math.inf
         max_txt_a = -math.inf
-        for txt in text_prompts:
+        # print(text_prompts_ppls)
+        # print(crt_length)
+        for txt_prompt_ppl in text_prompts_ppls:
+
+            txt = txt_prompt_ppl[0]
+
             txt_a = get_arousal_score(txt.split(" "))[0]
             txt_v = get_valence_score(txt.split(" "))[0]
             max_txt_v = max(txt_a,max_txt_v)
             max_txt_a = max(txt_v, max_txt_a)
-            tmps = get_storylines(txt, crt_budget, self.model, self.tokenizer, self.branch_factors[-1], device=torch.device("cuda"))
-            # embed()
-            for tmp in tmps:
+            rt_txts_ppls = get_storylines(txt_prompt_ppl, crt_length, self.model, self.tokenizer, self.branch_factors[-1], device=torch.device("cuda"))
+            crt_appendee = []
+            for tmp in rt_txts_ppls:
+                appendee_txt = tmp[0]
+                appendee_txt_ppl = tmp[1]
                 # v = get_valence_score(tmp.split(" "))[0]
-                a = get_arousal_score(tmp.split(" "))[0]
-                txts_at_timestep.append((tmp, a, txt_v, txt_a))
-
-            buckets = self.put_buckets(buckets, txts_at_timestep)
-        overall_features.append((crt_length, max_txt_v, max_txt_a))
+                a = get_arousal_score(appendee_txt.split(" "))[0]
+                gem = (appendee_txt, a - 0.00005 * appendee_txt_ppl, txt_v, txt_a, appendee_txt_ppl)
+                txts_at_timestep.append(gem)
+                crt_appendee.append(gem)
+            buckets = self.put_buckets(buckets, crt_appendee)
+        overall_features.append((crt_length, max_txt_v, max_txt_a, txt_prompt_ppl[1]))
         prompt_sample_rewards, best_per_bucket = self.get_topk_reward_each_bucket(buckets, crt_budget, crt_length)
 
-        return txts_at_timestep, overall_features, np.asarray(prompt_sample_rewards), best_per_bucket
+        return txts_at_timestep, overall_features, np.asarray(prompt_sample_rewards), best_per_bucket, buckets
 
     def generate_gpt_examples(self, text_prompts, crt_length, crt_budget):
         """

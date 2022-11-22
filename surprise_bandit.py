@@ -11,7 +11,7 @@ import numpy as np
 import pickle
 from tqdm import tqdm
 arms=3
-features=3
+features=4
 rewardType='positive'
 #rewardType='binary'
 featureType='integer'
@@ -46,25 +46,26 @@ for epoch in range(10):
         crt_length = 0
         print(contexts[id])
         if contexts[id].endswith(" "):
-            prompts = [contexts[id][:-1]]
+            prompts_ppls = [[contexts[id][:-1],1]]
         else:
-            prompts = [contexts[id]]
+            prompts_ppls = [[contexts[id],1]]
 
         while True:
             crt_length += 1
-            (txts_at_timestep, overall_sample_features, overall_rewards, best_per_bucket) = dg.generate_gpt_topk_example(prompts,crt_length, crt_budget)
-            if len(txts_at_timestep)==len(prompts):
-                break
+            (txts_at_timestep, overall_sample_features, overall_rewards, best_per_bucket, buckets) = dg.generate_gpt_topk_example(prompts_ppls,crt_length, crt_budget)
+            # if len(txts_at_timestep)==len(prompts_ppls):
+            #     break
             if crt_length>10:
                 break
             print("the length of generated prompts are", len(txts_at_timestep))
             regret, rmse, armChoice = simulator.simulate(overall_sample_features, overall_rewards, dg.W)
             print("the choice is ", armChoice)
+            txts_at_timestep = buckets[armChoice]
             txts_at_timestep.sort(key=lambda tup: tup[1], reverse=True)
             txts_at_timestep = txts_at_timestep[:dg.branch_factors[armChoice]]
             # embed()
             print("the length of filtered prompts are", len(txts_at_timestep))
-            prompts = [i[0] for i in txts_at_timestep]
+            prompts_ppls = [(i[0],i[-1]) for i in txts_at_timestep]
             crt_budget = int(crt_budget/dg.branch_factors[armChoice])
 
             if previous_rmse == 0:

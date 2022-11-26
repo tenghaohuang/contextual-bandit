@@ -148,7 +148,8 @@ def wrapup_input(input,mode):
         prompt = SPECIAL_TOKENS['bos_token'] + input + \
                  SPECIAL_TOKENS['sep_token']
     elif mode == "prompt":
-        prompt = '[title]' + '[story] '+ input
+        # prompt = '[title] ' +input+ ' [story] '
+        prompt = '[title] [story] '+input
     return prompt
 
 

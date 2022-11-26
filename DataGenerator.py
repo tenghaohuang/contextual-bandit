@@ -10,7 +10,9 @@ from valence_measure import get_valence_score, get_arousal_score
 from nltk.tokenize import word_tokenize
 from ppl_sentence_level import get_story_ppl, process_story
 import string
+from GLTR import LM
 import torch
+from scipy.special import softmax
 from IPython import embed
 class DataGenerator():
     """
@@ -29,7 +31,6 @@ class DataGenerator():
         self.means = np.random.normal(size=self.K)
         self.stds = 1 + 2*np.random.rand(self.K)
         self.device =  torch.device("cuda")
-
         # generate the weight vectors.  initialize estimate of feature
         # importance for each arm's d features
         self.generate_weight_vectors()
@@ -38,6 +39,7 @@ class DataGenerator():
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.model.to(self.device)
         self.model.eval()
+        self.LM = LM(self.model, self.tokenizer)
         self.topk = 10
         self.branch_factors = [10, 30, 60]
         self.evaluating = False
@@ -57,8 +59,7 @@ class DataGenerator():
             start += anchors[num]
         return l
 
-
-    def get_topk_reward_each_bucket(self, buckets, budget, crt_length):
+    def get_topk_reward_each_bucket(self, buckets, budget, crt_length, previous_pivot):
         sample_rewards = []
         best_per_bucket = []
         # branch_facts = [True if budget > b else False for b in self.branch_factors]
@@ -66,17 +67,37 @@ class DataGenerator():
         # print(tup)
         # embed()#look at perplex
         for num in range(len(buckets)):
-
-
             b = self.branch_factors[num]
-
-
             buckets[num].sort(key=lambda tup: tup[1], reverse=True)
-            sample_rewards.append(buckets[num][0][1]-0.0010*b)
-            best_per_bucket.append((buckets[num][0][0],buckets[num][0][1]-0.0010*b,\
+            reward = np.exp(buckets[num][0][1] - 0.0001 * b - previous_pivot)
+            sample_rewards.append(reward)
+        # sample_rewards = [5 * i / sum(sample_rewards) for i in sample_rewards]
+        sample_rewards = np.e ** (5*softmax(sample_rewards)) - np.e
+
+        for num in range(len(buckets)):
+            best_per_bucket.append((buckets[num][0][0], sample_rewards[num], \
                                     buckets[num][0][-1]))
 
         return sample_rewards, best_per_bucket
+    # def get_topk_reward_each_bucket(self, buckets, budget, crt_length):
+    #     sample_rewards = []
+    #     best_per_bucket = []
+    #     # branch_facts = [True if budget > b else False for b in self.branch_factors]
+    #
+    #     # print(tup)
+    #     # embed()#look at perplex
+    #     for num in range(len(buckets)):
+    #
+    #
+    #         b = self.branch_factors[num]
+    #
+    #
+    #         buckets[num].sort(key=lambda tup: tup[1], reverse=True)
+    #         sample_rewards.append(buckets[num][0][1]-0.0010*b)
+    #         best_per_bucket.append((buckets[num][0][0],buckets[num][0][1]-0.0010*b,\
+    #                                 buckets[num][0][-1]))
+    #
+    #     return sample_rewards, best_per_bucket
 
     def put_buckets(self, buckets, txts_at_timestep):
         for num, b in enumerate(self.branch_factors):
@@ -101,86 +122,22 @@ class DataGenerator():
             txt_v = get_valence_score(txt.split(" "))[0]
             max_txt_v = max(txt_a,max_txt_v)
             max_txt_a = max(txt_v, max_txt_a)
-            rt_txts_ppls = get_storylines(txt_prompt_ppl, crt_length, self.model, self.tokenizer, self.branch_factors[-1], device=torch.device("cuda"))
+            rt_txts_ppls = get_storylines(txt_prompt_ppl, crt_length, self.model, self.tokenizer, self.LM, self.branch_factors[-1], device=torch.device("cuda"))
             crt_appendee = []
             for tmp in rt_txts_ppls:
                 appendee_txt = tmp[0]
                 appendee_txt_ppl = tmp[1]
                 # v = get_valence_score(tmp.split(" "))[0]
                 a = get_arousal_score(appendee_txt.split(" "))[0]
-                gem = (appendee_txt, a - 0.00005 * appendee_txt_ppl, txt_v, txt_a, appendee_txt_ppl)
+                gem = (appendee_txt, a - 0.003*appendee_txt_ppl, txt_v, txt_a, appendee_txt_ppl)
                 txts_at_timestep.append(gem)
                 crt_appendee.append(gem)
             buckets = self.put_buckets(buckets, crt_appendee)
         overall_features.append((crt_length, max_txt_v, max_txt_a, txt_prompt_ppl[1]))
-        prompt_sample_rewards, best_per_bucket = self.get_topk_reward_each_bucket(buckets, crt_budget, crt_length)
+        prompt_sample_rewards, best_per_bucket = self.get_topk_reward_each_bucket(buckets, crt_budget, crt_length, previous_pivot=max_txt_a)
 
         return txts_at_timestep, overall_features, np.asarray(prompt_sample_rewards), best_per_bucket, buckets
 
-    def generate_gpt_examples(self, text_prompts, crt_length, crt_budget):
-        """
-        :param n:
-        :return:
-            sample_features: a list of (crt_budget, crt_valence, crt_arousal, ctr_perplexity)
-
-            sample_rewards:  a list of (arousal) tuples
-        """
-
-        overall_lists = []
-        overall_rewards = []
-        overall_sample_features = []
-
-        anchors = []
-        candidate_list = []
-        prompt_val_scores = []
-        prompt_arousal_scores = []
-        prompts_lens = []
-        for id, prompt in enumerate(text_prompts):
-
-            prompt_tokens = word_tokenize(prompt)
-            # overall_sample_features.append((crt_length, crt_budget, prompt_val_score, prompt_arousal_score, ppls[id].cpu().detach().numpy()))
-
-            if not self.evaluating:
-                candidate_list_, local_validates_infos = get_storylines(prompt, crt_budget, self.model, self.tokenizer, self.branch_factors[-1],self.device)
-            #filter out random shit
-
-            # if crt_length == 3:
-            #     candidate_list_ = self.filter_by_perplexity(candidate_list_, crt_length)
-            if candidate_list_ == []:
-                continue
-            candidate_list += candidate_list_
-            prompts_lens += [len(prompt)]*len(candidate_list_)
-            prompt_val_scores += [get_valence_score(prompt_tokens)[0]]*len(candidate_list_)
-            prompt_arousal_scores += [get_valence_score(prompt_tokens)[0]]*len(candidate_list_)
-            anchors.append(len(candidate_list_))
-        overall_sample_features.append(
-            (crt_length, crt_budget, max(prompt_val_scores), max(prompt_arousal_scores)))
-
-
-        # cut the original length
-
-        curated_candidate_list = [i[prompts_lens[num]:] for num,i in enumerate(candidate_list) ]
-        candidate_list_tokens = [word_tokenize(candidate) for candidate in curated_candidate_list]
-        val_scores = [(prompt_val_scores[num] + get_valence_score(i)[0],num) if get_valence_score(i)[0] is not None else (prompt_val_scores,num) \
-                          for num, i in enumerate(candidate_list_tokens)]
-        arousal_scores = [(prompt_arousal_scores[num] + get_arousal_score(i)[0], num) if get_arousal_score(i)[0] is not None else (prompt_arousal_scores, num) \
-                              for num, i in enumerate(candidate_list_tokens)]
-
-        prompt_sample_rewards, best_per_bucket = self.get_reward_each_bucket((val_scores,arousal_scores),crt_budget, anchors, crt_length)
-
-        best_gen_per_bucket = []
-        for buckets in best_per_bucket:
-            tmp = []
-            for score, rank in buckets:
-                tmp.append(candidate_list[int(rank)])
-            best_gen_per_bucket.append((score,tmp))
-
-        overall_rewards.append(prompt_sample_rewards)
-        overall_lists += candidate_list
-
-
-        # overall_best_per_bucket.sort(key=lambda tup: tup[0], reverse=True)
-        return overall_lists, overall_sample_features, np.asarray(overall_rewards),best_gen_per_bucket,anchors
 
     def filter_by_perplexity(self, candidate_list,crt_length):
         rt_l = []
@@ -193,44 +150,6 @@ class DataGenerator():
             rt_l = []
         return rt_l
 
-    def generate_samples(self,n=1000):
-        # the sample feature vectors X are only binary
-
-        if self.feature_type == 'binary':
-            X = np.random.randint(0,2,size=(n,self.D))
-        elif self.feature_type == 'integer':
-            X = np.random.randint(0,5,size=(n,self.D))
-        
-        # the rewards are functions of the inner products of the
-        # feature vectors with (current) weight estimates       
-        IP = np.dot(X,self.W.T)
-
-        # now get the rewards
-        if self.reward_type == 'binary':
-            R = ((np.sign(np.random.normal(self.means + IP,self.stds)) + 1) / 2).astype(int)
-        elif self.reward_type == 'positive':
-            #R = np.random.lognormal(self.means + IP,self.stds)
-            R = np.abs(np.random.normal(self.means + IP,self.stds))
-        elif self.reward_type == 'mixed':
-            R = (np.sign(np.random.normal(self.means + IP,self.stds)) + 1) / 2
-            R *= np.random.lognormal(self.means + IP,self.stds)
-
-        return X,R
-
-    # generate all bernoulli rewards ahead of time
-    def generate_bernoulli_bandit_data(self,num_samples):
-        #initialize parameter estimates
-        CTRs_that_generated_data = np.tile(np.random.rand(self.K),(num_samples,1))
-        #did the trial succeed?
-        true_rewards = np.random.rand(num_samples,self.K) < CTRs_that_generated_data
-        return true_rewards,CTRs_that_generated_data
-
-    # Thompson Sampling
-    # basic idea: samples from distribution and compares those values for the arms instead
-    # http://www.economics.uci.edu/~ivan/asmb.874.pdf
-    # http://camdp.com/blogs/multi-armed-bandits
-    def thompson_sampling(self,observed_data):
-        return np.argmax( np.random.beta(observed_data[:,0], observed_data[:,1]) )
 
 
     # the bandit algorithm

@@ -4,13 +4,13 @@ from IPython import embed
 from utils import getStories, get_transformer
 from config import Config
 from valence_measure import get_valence_score, get_arousal_score
-results = pickle.load(open("evaluation.p","rb"))
-modes = ["small","medium","large","random","planned"]
-model, tokenizer = get_transformer(Config.GPT2_finetuned_ROC)
-win = {}
 
-embed()
-contexts, references = getStories(Config.story_path, story_num=50000, surprise_position=1)
+modes = ["small","medium","large","random","planned"]
+
+
+
+# model, tokenizer = get_transformer(Config.GPT2_finetuned_ROC)
+# contexts, references = getStories(Config.story_path, story_num=50000, surprise_position=1)
 modes = ["normal-small","normal-medium","normal-large","normal-random"]
 import numpy as np
 from tqdm import tqdm
@@ -44,27 +44,48 @@ def normal_gen(contexts, mode):
     return all
 
 
-for mode in modes:
+# for mode in modes:
+#
+#     rt = normal_gen(contexts,mode)
+#     for cnt in range(100):
+#         results[cnt].append(rt[cnt])
+#
+def get_ascore(txt):
+    words = txt.split(" ")
+    a = get_arousal_score(words)[0]
+    return a
 
-    rt = normal_gen(contexts,mode)
-    for cnt in range(100):
-        results[cnt].append(rt[cnt])
 
+def get_result(file):
+    win = {}
+    print(file)
+    results = pickle.load(open(file, "rb"))
+    for result in results:
+        new_result = [(tup[0],get_ascore(tup[1])) for tup in result]
+        # print(new_result)
+        # assert(False)
+        new_result.sort(key=lambda tup: tup[1], reverse=True)
+        for num, tup in enumerate(new_result):
 
-for result in results:
-    for num, tup in enumerate(result):
-        if tup[0] not in win:
-            win[tup[0]] = num
-        else:
-            win[tup[0]] += num
-print(win)
+            if tup[0] not in win:
+                win[tup[0]] = 1/(num+1)
+            else:
+                win[tup[0]] += 1/(num+1)
 
-arousal = {}
-for result in results:
-    for num, tup in enumerate(result):
-        if tup[0] not in arousal:
-            arousal[tup[0]] = tup[2]
-        else:
-            arousal[tup[0]] += tup[2]
+    print(win)
 
-print(arousal)
+    arousal = {}
+    for result in results:
+        for num, tup in enumerate(result):
+            if tup[0] not in arousal:
+                arousal[tup[0]] = tup[2]
+            else:
+                arousal[tup[0]] += tup[2]
+
+    print(arousal)
+file = "evaluation_4.p"
+get_result(file)
+file = "evaluation_6.p"
+get_result(file)
+file = "evaluation_8.p"
+get_result(file)

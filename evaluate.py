@@ -60,8 +60,13 @@ def get_result(file):
     win = {}
     print(file)
     results = pickle.load(open(file, "rb"))
-    for result in results:
-        new_result = [(tup[0],get_ascore(tup[1])) for tup in result]
+    planned_results = pickle.load(open(file[:-2]+"_planned_gold.p", "rb"))
+    # print(planned_results)
+    total = []
+    for num, result in enumerate(results):
+        new_result = [(tup[0],get_ascore(tup[1])) for tup in result if tup[0] != "planned"]
+        new_result.append((planned_results[num][0][0],get_ascore(planned_results[num][0][1])))
+        total.append(new_result)
         # print(new_result)
         # assert(False)
         new_result.sort(key=lambda tup: tup[1], reverse=True)
@@ -71,21 +76,24 @@ def get_result(file):
                 win[tup[0]] = 1/(num+1)
             else:
                 win[tup[0]] += 1/(num+1)
-
+    # win['planned'] = [0]
+    # for result in results:
+    #     win['planned']
     print(win)
 
     arousal = {}
-    for result in results:
+    for result in total:
+        # print(result)
         for num, tup in enumerate(result):
             if tup[0] not in arousal:
-                arousal[tup[0]] = tup[2]
+                arousal[tup[0]] = tup[1]
             else:
-                arousal[tup[0]] += tup[2]
+                arousal[tup[0]] += tup[1]
 
     print(arousal)
 file = "evaluation_4.p"
 get_result(file)
-file = "evaluation_6.p"
+# file = "evaluation_6.p"
 get_result(file)
-file = "evaluation_8.p"
-get_result(file)
+# file = "evaluation_8.p"
+# get_result(file)

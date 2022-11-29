@@ -281,20 +281,20 @@ def finish_story(prompt, model, tokenizer, num_story_return, surprise_position =
         # found an exception: " I was talking to my crush today. \
         # She continued to complain about guys flirting with her.", "
         # ^ the continuation is invalid
-
-        if surprise_position+1>len(sts):
-            continuation = "None."
-            sts.append(continuation)
-        else:
-            continuation = sts[surprise_position]
-
-        if surprise_position>0:
-            conts.append(continuation)
-            texts.append(sts[:surprise_position+1])
-        else:
-            conts.append(sts[surprise_position:])
-            texts.append(" ".join(sts))
-    return conts,texts
+        texts.append(sts)
+        # if surprise_position+1>len(sts):
+        #     continuation = "None."
+        #     sts.append(continuation)
+        # else:
+        #     continuation = sts[surprise_position]
+        #
+        # if surprise_position>0:
+        #     conts.append(continuation)
+        #     texts.append(sts[:surprise_position+1])
+        # else:
+        #     conts.append(sts[surprise_position:])
+        #     texts.append(" ".join(sts))
+    return  texts
 
 def finish_stories(prompts, model, tokenizer, num_story_return, num_st_return=-1 ):
     rt = []

@@ -24,7 +24,7 @@ featureType='integer'
 contexts, references = getStories(Config.story_path, story_num=50000, surprise_position=1)
 dg = DataGenerator.DataGenerator(arms, features, feature_type=featureType, reward_type=rewardType)
 
-# model, tokenizer = get_transformer(Config.GPT2_finetuned_ROC)
+model, tokenizer = get_transformer(Config.GPT2_finetuned_ROC)
 # model.cuda()
 # model.eval()
 # open('surprise_bandit_epoch_0','rb').close()

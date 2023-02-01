@@ -6,7 +6,7 @@ import pandas as pd
 from scipy.stats import zscore
 import math
 import warnings
-from pandas.core.common import SettingWithCopyWarning
+# from pandas.core.common import SettingWithCopyWarning
 import pickle
 from utils import *
 import scipy.stats as ss
@@ -32,7 +32,7 @@ def get_NRC_lexicon(path):
     return (val_dict, aro_dict, dom_dict)
 
 
-val_dict, aro_dict, _ = get_NRC_lexicon("/playpen-ssd/tenghao/creative_writing/Finetuned_GPT2/dataset/NRC-VAD-Lexicon.txt")
+val_dict, aro_dict, _ = get_NRC_lexicon("/nas/luka-group/tenghao/tenghaoh/creative_writing/Finetuned_GPT2/dataset/NRC-VAD-Lexicon.txt")
 
 def get_arousal_score(infs):
     '''

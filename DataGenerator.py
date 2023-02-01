@@ -39,7 +39,8 @@ class DataGenerator():
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.model.to(self.device)
         self.model.eval()
-        self.LM = LM(self.model, self.tokenizer)
+        # self.LM = LM(self.model, self.tokenizer)
+        self.LM = ""
         self.topk = 10
         self.branch_factors = [10, 30, 60]
         self.evaluating = False
@@ -123,6 +124,7 @@ class DataGenerator():
             max_txt_v = max(txt_a,max_txt_v)
             max_txt_a = max(txt_v, max_txt_a)
             rt_txts_ppls = get_storylines(txt_prompt_ppl, crt_length, self.model, self.tokenizer, self.LM, self.branch_factors[-1], device=torch.device("cuda"))
+            # embed()
             crt_appendee = []
             for tmp in rt_txts_ppls:
                 appendee_txt = tmp[0]

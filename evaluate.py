@@ -9,7 +9,7 @@ modes = ["small","medium","large","random","planned"]
 
 
 
-# model, tokenizer = get_transformer(Config.GPT2_finetuned_ROC)
+model, tokenizer = get_transformer(Config.GPT2_finetuned_ROC)
 # contexts, references = getStories(Config.story_path, story_num=50000, surprise_position=1)
 modes = ["normal-small","normal-medium","normal-large","normal-random"]
 import numpy as np

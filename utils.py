@@ -13,6 +13,7 @@ import re
 import json
 import pandas as pd
 import os
+import pickle
 import string
 from datetime import datetime
 from sklearn.metrics.pairwise import cosine_similarity
@@ -44,8 +45,10 @@ def get_GPT2_sampling_mode(input_path):
     return dict["GPT2_sampling_method"]
 
 def getStories(story_path,story_num=10,surprise_position=2):
-    columns = ["storyid",	"storytitle",	"sentence1","sentence2","sentence3","sentence4","sentence5"]
-    df = pd.read_csv(story_path, sep=',', header=None, names = columns)
+    columns = ["storyid", "storytitle", "sentence1", "sentence2", "sentence3", "sentence4", "sentence5"]
+    with open(story_path, 'rb') as handle:
+        df = pickle.load(handle)
+    # df = pd.read_csv(story_path, encoding="ISO-8859-1", names=columns, engine='c')
     df = df[1:]
     setting = []
     reference = []
@@ -264,7 +267,7 @@ def split_sentences(corpus):
 
 
 
-def finish_story(prompt, model, tokenizer, num_story_return, surprise_position = -1):
+def finish_story(prompt, model, tokenizer, beam_size,num_story_return, surprise_position = -1):
 
     prompt = prompt.strip("\n")
     prompt = prompt.strip(" ")
@@ -272,7 +275,7 @@ def finish_story(prompt, model, tokenizer, num_story_return, surprise_position =
         prompt = prompt +". "
     warpped_prompt = wrapup_input(prompt,"prompt")
     input_ids = tokenizer(warpped_prompt, return_tensors="pt").input_ids.cuda()
-    sample_outputs = model.generate(input_ids=input_ids, max_length=100, do_sample=True, num_return_sequences=num_story_return)
+    sample_outputs = model.generate(input_ids=input_ids, max_length=100, do_sample=True, beam_size=beam_size,num_return_sequences=num_story_return)
     conts = []
     texts = []
     for i, sample_output in enumerate(sample_outputs):

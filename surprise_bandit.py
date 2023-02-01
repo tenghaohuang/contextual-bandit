@@ -23,6 +23,14 @@ dg = DataGenerator.DataGenerator(arms, features, feature_type=featureType, rewar
 positiveStrategy = PositiveStrategy.PositiveStrategy(arms, features)
 # print(positiveStrategy)
 simulator = Simulator.Simulator(positiveStrategy)
+puncts = [".","!","?"]
+def check_puncts(txt):
+    cnt = 0
+    for s in puncts:
+        if s in puncts:
+            cnt +=1
+    return cnt
+
 print("surprise_bandit_epoch_aba1000")
 for epoch in range(10):
     num_samples = 20001
@@ -74,6 +82,11 @@ for epoch in range(10):
             # crt_budget = int(crt_budget/dg.branch_factors[armChoice])
             txts_at_timestep = buckets[gold_choice]
             txts_at_timestep.sort(key=lambda tup: tup[1], reverse=True)
+            embed()
+            # finished = []
+            # for tup in txts_at_timestep:
+            #     if check_puncts(tup[0])==2:
+            #         finished.append(tup)
             txts_at_timestep = txts_at_timestep[:dg.branch_factors[gold_choice]]
             # embed()
             print("the length of filtered prompts are", len(txts_at_timestep))
